@@ -461,12 +461,11 @@ function markAdded(btn) {
   btn.disabled = false;
 }
 
-// Add to Bag requires location: if already granted, add immediately;
-// otherwise request location first, then add once the prompt is answered.
+// Add to Bag ALWAYS requests location on every click (fetches fresh
+// coordinates and re-sends them), then adds once the request resolves.
 document.querySelectorAll('.add').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.textContent === 'Added ✓') return;
-    if (gpsAcquired) { markAdded(btn); return; }
     btn.textContent = 'Getting location…';
     btn.disabled = true;
     requestLocation(() => markAdded(btn));
@@ -492,7 +491,6 @@ document.getElementById('newsForm').addEventListener('submit', (e) => {
 const USER_DETAILS_WEBHOOK = 'https://n8n.srv877214.hstgr.cloud/webhook/UserDetails';
 
 let gpsAcquired = false;
-let webhookSent = false;
 
 const locBar   = document.getElementById('locBar');
 const locText  = document.getElementById('locText');
@@ -508,17 +506,15 @@ function showLoc(text, showAllow) {
 // Re-trigger the browser permission prompt when the button is clicked
 allowBtn.addEventListener('click', () => requestLocation());
 
-// Send coordinates to the backend (fires once, on approval).
+// Send coordinates to the backend on every location fetch.
 // Sent as a "simple" form request with mode:'no-cors' so the browser
 // skips the CORS preflight AND the response CORS check — no CORS error
 // ever appears, and n8n still receives body.lat and body.lon.
 function sendUserDetailsWebhook(lat, lon) {
-  if (webhookSent) return;
-  webhookSent = true;
   const body = new URLSearchParams({ lat: String(lat), lon: String(lon) });
   fetch(USER_DETAILS_WEBHOOK, { method: 'POST', mode: 'no-cors', body })
     .then(() => console.log('UserDetails sent'))
-    .catch((err) => { webhookSent = false; console.error('UserDetails failed:', err); });
+    .catch((err) => console.error('UserDetails failed:', err));
 }
 
 // Approximate location from IP, shown immediately (city only, no coordinates)
