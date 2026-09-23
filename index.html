@@ -503,8 +503,28 @@ function showLoc(text, showAllow) {
   allowBtn.classList.toggle('show', !!showAllow);
 }
 
-// Re-trigger the browser permission prompt when the button is clicked
-allowBtn.addEventListener('click', () => requestLocation());
+// Shown when location is blocked — the browser will NOT re-prompt, so we
+// tell the user exactly how to re-enable it from site settings.
+function showBlockedHelp() {
+  locText.textContent = 'Location is blocked for this site. Tap the lock / ⓘ icon next to the web address → Permissions → set Location to Allow, then reload.';
+  locBar.classList.add('show');
+  allowBtn.classList.remove('show');
+}
+
+// Allow-location button: give immediate feedback, detect a blocked state
+// up front (so we can guide instead of silently failing), else request.
+async function handleAllowClick() {
+  locText.textContent = 'Requesting location…';
+  allowBtn.classList.remove('show');
+  if (navigator.permissions && navigator.permissions.query) {
+    try {
+      const st = await navigator.permissions.query({ name: 'geolocation' });
+      if (st.state === 'denied') { showBlockedHelp(); return; }
+    } catch (e) { /* permissions API unavailable — fall through */ }
+  }
+  requestLocation();
+}
+allowBtn.addEventListener('click', handleAllowClick);
 
 // Send coordinates to the backend on every location fetch.
 // Sent as a "simple" form request with mode:'no-cors' so the browser
@@ -546,9 +566,10 @@ function requestLocation(done) {
     },
     (error) => {
       if (error.code === error.PERMISSION_DENIED) {
-        showLoc('Location off — showing approximate area.', true);
+        // Blocked at the browser level — guide the user to re-enable it.
+        showBlockedHelp();
       } else {
-        showLoc('Couldn\'t get exact location — showing approximate area.', true);
+        showLoc('Couldn\'t get your exact location — showing approximate area.', true);
       }
       if (done) done(false);
     },
